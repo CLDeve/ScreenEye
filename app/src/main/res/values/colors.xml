@@ -1,0 +1,7 @@
+<resources>
+    <color name="screeneye_primary">#0F172A</color>
+    <color name="screeneye_on_primary">#FFFFFF</color>
+    <color name="screeneye_secondary">#334155</color>
+    <color name="screeneye_background">#111827</color>
+    <color name="screeneye_on_background">#E5E7EB</color>
+</resources>
