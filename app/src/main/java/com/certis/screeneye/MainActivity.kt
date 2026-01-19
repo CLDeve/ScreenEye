@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var calibrationOverlay: ConstraintLayout
     private lateinit var calibrationBody: TextView
     private lateinit var calibrationCountdown: TextView
+    private lateinit var startButton: android.widget.Button
     private lateinit var rootLayout: ConstraintLayout
     private lateinit var alertOverlay: View
     private lateinit var cameraExecutor: ExecutorService
@@ -73,6 +74,7 @@ class MainActivity : AppCompatActivity() {
     private val minEyeCalibrationSamples = 10
     private val eyeDownRatioThreshold = 0.04f
     private val eyeClosedProbabilityThreshold = 0.4f
+    private var hasStarted = false
 
     private var sessionStartMs = 0L
     private var lastStateChangeMs = 0L
@@ -106,11 +108,14 @@ class MainActivity : AppCompatActivity() {
         calibrationOverlay = findViewById(R.id.calibrationOverlay)
         calibrationBody = findViewById(R.id.calibrationBody)
         calibrationCountdown = findViewById(R.id.calibrationCountdown)
+        startButton = findViewById(R.id.startButton)
         alertOverlay = findViewById(R.id.alertOverlay)
         alertOverlay.alpha = 0f
         warningText.visibility = View.GONE
         statsText.visibility = View.GONE
         calibrationOverlay.visibility = View.VISIBLE
+        calibrationBody.text = "Tap Start to begin"
+        calibrationCountdown.text = "Waiting to start..."
         cameraExecutor = Executors.newSingleThreadExecutor()
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         setBeepVolumePercent(75)
@@ -130,6 +135,16 @@ class MainActivity : AppCompatActivity() {
             .enableTracking()
             .build()
         faceDetector = FaceDetection.getClient(options)
+
+        startButton.setOnClickListener {
+            if (!hasStarted) {
+                hasStarted = true
+                resetCalibration()
+                startButton.visibility = View.GONE
+                calibrationBody.text = "Look straight at the screen"
+                calibrationCountdown.text = "Calibrating..."
+            }
+        }
 
         requestCameraPermission.launch(Manifest.permission.CAMERA)
     }
@@ -193,6 +208,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleFaces(faces: List<Face>) {
+        if (!hasStarted) {
+            return
+        }
         val now = System.currentTimeMillis()
         if (lastLookingTimeMs == 0L) {
             lastLookingTimeMs = now
@@ -406,6 +424,19 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             statsText.text = "Focus $focusPercent%\nLook-aways $lookAwayCount\nLongest ${formatDuration(longestFocusMs)}"
         }
+    }
+
+    private fun resetCalibration() {
+        isCalibrating = true
+        calibrationStartMs = 0L
+        calibrationSamples = 0
+        calibrationYawSum = 0f
+        calibrationPitchSum = 0f
+        calibrationEyeRatioSum = 0f
+        calibrationEyeRatioSamples = 0
+        baselineEyeYRatio = null
+        lastLookingTimeMs = 0L
+        isLookingState = null
     }
 
     private fun eyeCenterRatio(face: Face): Float? {
