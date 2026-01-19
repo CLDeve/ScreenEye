@@ -68,7 +68,7 @@ class MainActivity : AppCompatActivity() {
     private var calibrationEyeRatioSum = 0f
     private var calibrationEyeRatioSamples = 0
     private var baselineEyeYRatio: Float? = null
-    private val calibrationDurationMs = 10_000L
+    private val calibrationDurationMs = 5_000L
     private val minCalibrationSamples = 20
     private val minEyeCalibrationSamples = 10
     private val eyeDownRatioThreshold = 0.04f
