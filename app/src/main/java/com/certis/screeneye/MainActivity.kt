@@ -29,6 +29,7 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
+import com.google.mlkit.vision.face.FaceLandmark
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.abs
@@ -64,8 +65,13 @@ class MainActivity : AppCompatActivity() {
     private var calibrationPitchSum = 0f
     private var baselineYaw = 0f
     private var baselinePitch = 0f
+    private var calibrationEyeRatioSum = 0f
+    private var calibrationEyeRatioSamples = 0
+    private var baselineEyeYRatio: Float? = null
     private val calibrationDurationMs = 10_000L
     private val minCalibrationSamples = 20
+    private val minEyeCalibrationSamples = 10
+    private val eyeDownRatioThreshold = 0.04f
 
     private var sessionStartMs = 0L
     private var lastStateChangeMs = 0L
@@ -118,6 +124,7 @@ class MainActivity : AppCompatActivity() {
 
         val options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .enableTracking()
             .build()
         faceDetector = FaceDetection.getClient(options)
@@ -197,7 +204,16 @@ class MainActivity : AppCompatActivity() {
         val isLooking = faces.isNotEmpty() && faces.any { face ->
             val yaw = face.headEulerAngleY
             val pitch = face.headEulerAngleX
-            abs(yaw - baselineYaw) <= 20f && abs(pitch - baselinePitch) <= 20f
+            val headAligned = abs(yaw - baselineYaw) <= 20f && abs(pitch - baselinePitch) <= 20f
+            if (!headAligned) {
+                return@any false
+            }
+            val baselineEyeRatio = baselineEyeYRatio
+            val currentEyeRatio = eyeCenterRatio(face)
+            val eyesDown = baselineEyeRatio != null &&
+                currentEyeRatio != null &&
+                currentEyeRatio - baselineEyeRatio >= eyeDownRatioThreshold
+            !eyesDown
         }
 
         runOnUiThread {
@@ -313,6 +329,11 @@ class MainActivity : AppCompatActivity() {
         calibrationYawSum += face.headEulerAngleY
         calibrationPitchSum += face.headEulerAngleX
         calibrationSamples += 1
+        val eyeRatio = eyeCenterRatio(face)
+        if (eyeRatio != null) {
+            calibrationEyeRatioSum += eyeRatio
+            calibrationEyeRatioSamples += 1
+        }
 
         val elapsed = now - calibrationStartMs
         val remaining = ((calibrationDurationMs - elapsed).coerceAtLeast(0L) / 1000L) + 1
@@ -328,6 +349,11 @@ class MainActivity : AppCompatActivity() {
         if (elapsed >= calibrationDurationMs && calibrationSamples >= minCalibrationSamples) {
             baselineYaw = calibrationYawSum / calibrationSamples
             baselinePitch = calibrationPitchSum / calibrationSamples
+            baselineEyeYRatio = if (calibrationEyeRatioSamples >= minEyeCalibrationSamples) {
+                calibrationEyeRatioSum / calibrationEyeRatioSamples
+            } else {
+                null
+            }
             isCalibrating = false
             lastLookingTimeMs = now
             lastStateChangeMs = now
@@ -377,6 +403,21 @@ class MainActivity : AppCompatActivity() {
         runOnUiThread {
             statsText.text = "Focus $focusPercent%\nLook-aways $lookAwayCount\nLongest ${formatDuration(longestFocusMs)}"
         }
+    }
+
+    private fun eyeCenterRatio(face: Face): Float? {
+        val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)?.position
+        val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position
+        if (leftEye == null || rightEye == null) {
+            return null
+        }
+        val bounds = face.boundingBox
+        val height = bounds.height().toFloat()
+        if (height <= 0f) {
+            return null
+        }
+        val eyeCenterY = (leftEye.y + rightEye.y) / 2f
+        return (eyeCenterY - bounds.top) / height
     }
 
     private fun formatDuration(durationMs: Long): String {
