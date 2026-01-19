@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.content.Intent
 import android.view.WindowManager
 import android.view.View
 import android.widget.Toast
@@ -26,6 +27,9 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import com.certis.screeneye.data.AppDatabase
+import com.certis.screeneye.data.LogEvent
+import com.certis.screeneye.data.LogEventDao
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
@@ -46,16 +50,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var calibrationBody: TextView
     private lateinit var calibrationCountdown: TextView
     private lateinit var startButton: android.widget.Button
+    private lateinit var logsButton: android.widget.Button
     private lateinit var shiftCountdownText: TextView
     private lateinit var shiftAlertOverlay: ConstraintLayout
     private lateinit var shiftAcknowledgeButton: android.widget.Button
     private lateinit var rootLayout: ConstraintLayout
     private lateinit var alertOverlay: View
     private lateinit var cameraExecutor: ExecutorService
+    private lateinit var logExecutor: ExecutorService
     private lateinit var toneGenerator: ToneGenerator
     private lateinit var faceDetector: FaceDetector
     private lateinit var audioManager: AudioManager
     private var originalVolume: Int? = null
+    private lateinit var logDao: LogEventDao
 
     private var lastLookingTimeMs = 0L
     private var lastAlertTimeMs = 0L
@@ -115,6 +122,8 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
+        logDao = AppDatabase.getInstance(this).logEventDao()
+        logExecutor = Executors.newSingleThreadExecutor()
 
         rootLayout = findViewById(R.id.rootLayout)
         previewView = findViewById(R.id.previewView)
@@ -125,6 +134,7 @@ class MainActivity : AppCompatActivity() {
         calibrationBody = findViewById(R.id.calibrationBody)
         calibrationCountdown = findViewById(R.id.calibrationCountdown)
         startButton = findViewById(R.id.startButton)
+        logsButton = findViewById(R.id.logsButton)
         shiftCountdownText = findViewById(R.id.shiftCountdownText)
         shiftAlertOverlay = findViewById(R.id.shiftAlertOverlay)
         shiftAcknowledgeButton = findViewById(R.id.shiftAcknowledgeButton)
@@ -162,12 +172,18 @@ class MainActivity : AppCompatActivity() {
                 startButton.visibility = View.GONE
                 calibrationBody.text = "Look straight at the screen"
                 calibrationCountdown.text = "Calibrating..."
+                logEvent("CALIBRATION_START", null, null)
             }
+        }
+
+        logsButton.setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
         }
 
         shiftAcknowledgeButton.setOnClickListener {
             shiftAlertOverlay.visibility = View.GONE
             startShiftTimer()
+            logEvent("SHIFT_ACK", null, null)
         }
 
         requestCameraPermission.launch(Manifest.permission.CAMERA)
@@ -181,6 +197,7 @@ class MainActivity : AppCompatActivity() {
         toneGenerator.release()
         restoreVolume()
         stopAlert()
+        logExecutor.shutdown()
     }
 
     override fun onResume() {
@@ -300,6 +317,7 @@ class MainActivity : AppCompatActivity() {
         }
         isAlertActive = true
         isAlertStrong = strong
+        logEvent("ALERT_START", if (strong) "strong" else "soft", null)
         runOnUiThread {
             warningText.text = if (strong) "LOOK AT SCREEN" else "Eyes on screen"
             warningText.visibility = View.VISIBLE
@@ -330,6 +348,7 @@ class MainActivity : AppCompatActivity() {
         }
         isAlertActive = false
         isAlertStrong = false
+        logEvent("ALERT_STOP", null, null)
         alertAnimator?.cancel()
         alertOverlay.alpha = 0f
         warningText.visibility = View.GONE
@@ -406,6 +425,7 @@ class MainActivity : AppCompatActivity() {
             isLookingState = true
             currentFocusStartMs = now
             startShiftTimer()
+            logEvent("CALIBRATION_COMPLETE", null, null)
             runOnUiThread {
                 calibrationOverlay.visibility = View.GONE
                 statusText.text = "Calibration complete"
@@ -433,9 +453,11 @@ class MainActivity : AppCompatActivity() {
                     longestFocusMs = focusSpan
                 }
                 lookAwayCount += 1
+                logEvent("LOOK_AWAY_START", null, null)
             } else {
                 totalAwayMs += delta
                 currentFocusStartMs = now
+                logEvent("LOOK_AWAY_END", null, delta)
             }
             lastStateChangeMs = now
             isLookingState = isLooking
@@ -473,6 +495,7 @@ class MainActivity : AppCompatActivity() {
         if (remaining == 0L) {
             shiftAlertOverlay.visibility = View.VISIBLE
             shiftHandler.removeCallbacks(shiftTickRunnable)
+            logEvent("SHIFT_ALERT", null, null)
         }
     }
 
@@ -487,6 +510,18 @@ class MainActivity : AppCompatActivity() {
         baselineEyeYRatio = null
         lastLookingTimeMs = 0L
         isLookingState = null
+    }
+
+    private fun logEvent(type: String, message: String?, durationMs: Long?) {
+        val event = LogEvent(
+            timestampMs = System.currentTimeMillis(),
+            type = type,
+            message = message,
+            durationMs = durationMs
+        )
+        logExecutor.execute {
+            logDao.insert(event)
+        }
     }
 
     private fun eyeCenterRatio(face: Face): Float? {
