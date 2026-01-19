@@ -10,6 +10,8 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import android.view.View
 import android.widget.Toast
@@ -44,6 +46,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var calibrationBody: TextView
     private lateinit var calibrationCountdown: TextView
     private lateinit var startButton: android.widget.Button
+    private lateinit var shiftCountdownText: TextView
+    private lateinit var shiftAlertOverlay: ConstraintLayout
+    private lateinit var shiftAcknowledgeButton: android.widget.Button
     private lateinit var rootLayout: ConstraintLayout
     private lateinit var alertOverlay: View
     private lateinit var cameraExecutor: ExecutorService
@@ -75,6 +80,17 @@ class MainActivity : AppCompatActivity() {
     private val eyeDownRatioThreshold = 0.04f
     private val eyeClosedProbabilityThreshold = 0.4f
     private var hasStarted = false
+    private val shiftDurationMs = 30 * 60 * 1000L
+    private var shiftStartMs = 0L
+    private val shiftHandler = Handler(Looper.getMainLooper())
+    private val shiftTickRunnable = object : Runnable {
+        override fun run() {
+            updateShiftCountdown()
+            if (hasStarted && shiftStartMs > 0L) {
+                shiftHandler.postDelayed(this, 1000L)
+            }
+        }
+    }
 
     private var sessionStartMs = 0L
     private var lastStateChangeMs = 0L
@@ -109,6 +125,9 @@ class MainActivity : AppCompatActivity() {
         calibrationBody = findViewById(R.id.calibrationBody)
         calibrationCountdown = findViewById(R.id.calibrationCountdown)
         startButton = findViewById(R.id.startButton)
+        shiftCountdownText = findViewById(R.id.shiftCountdownText)
+        shiftAlertOverlay = findViewById(R.id.shiftAlertOverlay)
+        shiftAcknowledgeButton = findViewById(R.id.shiftAcknowledgeButton)
         alertOverlay = findViewById(R.id.alertOverlay)
         alertOverlay.alpha = 0f
         warningText.visibility = View.GONE
@@ -140,10 +159,16 @@ class MainActivity : AppCompatActivity() {
             if (!hasStarted) {
                 hasStarted = true
                 resetCalibration()
+                startShiftTimer()
                 startButton.visibility = View.GONE
                 calibrationBody.text = "Look straight at the screen"
                 calibrationCountdown.text = "Calibrating..."
             }
+        }
+
+        shiftAcknowledgeButton.setOnClickListener {
+            shiftAlertOverlay.visibility = View.GONE
+            startShiftTimer()
         }
 
         requestCameraPermission.launch(Manifest.permission.CAMERA)
@@ -151,6 +176,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        shiftHandler.removeCallbacksAndMessages(null)
         cameraExecutor.shutdown()
         faceDetector.close()
         toneGenerator.release()
@@ -423,6 +449,30 @@ class MainActivity : AppCompatActivity() {
 
         runOnUiThread {
             statsText.text = "Focus $focusPercent%\nLook-aways $lookAwayCount\nLongest ${formatDuration(longestFocusMs)}"
+        }
+    }
+
+    private fun startShiftTimer() {
+        shiftStartMs = System.currentTimeMillis()
+        updateShiftCountdown()
+        shiftHandler.removeCallbacks(shiftTickRunnable)
+        shiftHandler.post(shiftTickRunnable)
+    }
+
+    private fun updateShiftCountdown() {
+        if (!hasStarted || shiftStartMs == 0L) {
+            shiftCountdownText.text = "Shift 30:00"
+            return
+        }
+        val elapsed = System.currentTimeMillis() - shiftStartMs
+        val remaining = (shiftDurationMs - elapsed).coerceAtLeast(0L)
+        val totalSeconds = remaining / 1000L
+        val minutes = totalSeconds / 60L
+        val seconds = totalSeconds % 60L
+        shiftCountdownText.text = String.format("Shift %02d:%02d", minutes, seconds)
+        if (remaining == 0L) {
+            shiftAlertOverlay.visibility = View.VISIBLE
+            shiftHandler.removeCallbacks(shiftTickRunnable)
         }
     }
 
