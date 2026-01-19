@@ -72,6 +72,7 @@ class MainActivity : AppCompatActivity() {
     private val minCalibrationSamples = 20
     private val minEyeCalibrationSamples = 10
     private val eyeDownRatioThreshold = 0.04f
+    private val eyeClosedProbabilityThreshold = 0.4f
 
     private var sessionStartMs = 0L
     private var lastStateChangeMs = 0L
@@ -124,6 +125,7 @@ class MainActivity : AppCompatActivity() {
 
         val options = FaceDetectorOptions.Builder()
             .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
             .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
             .enableTracking()
             .build()
@@ -213,7 +215,8 @@ class MainActivity : AppCompatActivity() {
             val eyesDown = baselineEyeRatio != null &&
                 currentEyeRatio != null &&
                 currentEyeRatio - baselineEyeRatio >= eyeDownRatioThreshold
-            !eyesDown
+            val eyesClosed = isEyesClosed(face)
+            !eyesDown && !eyesClosed
         }
 
         runOnUiThread {
@@ -418,6 +421,15 @@ class MainActivity : AppCompatActivity() {
         }
         val eyeCenterY = (leftEye.y + rightEye.y) / 2f
         return (eyeCenterY - bounds.top) / height
+    }
+
+    private fun isEyesClosed(face: Face): Boolean {
+        val leftOpen = face.leftEyeOpenProbability
+        val rightOpen = face.rightEyeOpenProbability
+        if (leftOpen == null || rightOpen == null) {
+            return false
+        }
+        return leftOpen < eyeClosedProbabilityThreshold && rightOpen < eyeClosedProbabilityThreshold
     }
 
     private fun formatDuration(durationMs: Long): String {
