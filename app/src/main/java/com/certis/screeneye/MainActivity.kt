@@ -159,7 +159,6 @@ class MainActivity : AppCompatActivity() {
             if (!hasStarted) {
                 hasStarted = true
                 resetCalibration()
-                startShiftTimer()
                 startButton.visibility = View.GONE
                 calibrationBody.text = "Look straight at the screen"
                 calibrationCountdown.text = "Calibrating..."
@@ -406,6 +405,7 @@ class MainActivity : AppCompatActivity() {
             lastStateChangeMs = now
             isLookingState = true
             currentFocusStartMs = now
+            startShiftTimer()
             runOnUiThread {
                 calibrationOverlay.visibility = View.GONE
                 statusText.text = "Calibration complete"
