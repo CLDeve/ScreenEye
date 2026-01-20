@@ -95,7 +95,7 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginStart="16dp"
-        app:layout_constraintVertical_bias="0.28" />
+        android:layout_marginTop="40dp" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/calibrationOverlay"
@@ -107,18 +107,6 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
-
-        <ImageView
-            android:id="@+id/calibrationIllustration"
-            android:layout_width="240dp"
-            android:layout_height="180dp"
-            android:src="@drawable/calibration_illustration"
-            android:contentDescription="Calibration illustration"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintVertical_bias="0.2" />
 
         <TextView
             android:id="@+id/calibrationTitle"
