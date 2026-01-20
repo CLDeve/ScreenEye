@@ -143,8 +143,8 @@ class MainActivity : AppCompatActivity() {
         warningText.visibility = View.GONE
         statsText.visibility = View.GONE
         calibrationOverlay.visibility = View.VISIBLE
-        calibrationBody.text = "Tap Start to begin"
-        calibrationCountdown.text = "Waiting to start..."
+        calibrationBody.text = "Sit centered and look straight at the screen"
+        calibrationCountdown.text = "Tap Start when ready"
         cameraExecutor = Executors.newSingleThreadExecutor()
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         setBeepVolumePercent(75)
@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
                 hasStarted = true
                 resetCalibration()
                 startButton.visibility = View.GONE
-                calibrationBody.text = "Look straight at the screen"
+                calibrationBody.text = "Keep your face centered and eyes on screen"
                 calibrationCountdown.text = "Calibrating..."
                 logEvent("CALIBRATION_START", null, null)
             }
@@ -376,7 +376,7 @@ class MainActivity : AppCompatActivity() {
         if (faces.isEmpty()) {
             runOnUiThread {
                 calibrationOverlay.visibility = View.VISIBLE
-                calibrationBody.text = "Center your face on screen"
+                calibrationBody.text = "Move into frame and center your face"
                 calibrationCountdown.text = "Waiting for face..."
                 statusText.text = "Calibrating"
                 warningText.visibility = View.GONE
@@ -404,7 +404,7 @@ class MainActivity : AppCompatActivity() {
         val remaining = ((calibrationDurationMs - elapsed).coerceAtLeast(0L) / 1000L) + 1
         runOnUiThread {
             calibrationOverlay.visibility = View.VISIBLE
-            calibrationBody.text = "Look straight at the screen"
+            calibrationBody.text = "Hold still and look straight at the screen"
             calibrationCountdown.text = "Calibrating... $remaining s"
             statusText.text = "Calibrating"
             warningText.visibility = View.GONE
