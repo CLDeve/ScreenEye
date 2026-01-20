@@ -6,21 +6,15 @@
         </shape>
     </item>
     <item
-        android:width="220dp"
+        android:width="120dp"
         android:height="120dp"
         android:gravity="center_horizontal|top"
-        android:top="10dp">
-        <bitmap
-            android:src="@drawable/ic_face"
-            android:gravity="center" />
-    </item>
+        android:top="12dp"
+        android:drawable="@drawable/ic_face" />
     <item
-        android:width="220dp"
+        android:width="120dp"
         android:height="120dp"
         android:gravity="center_horizontal|bottom"
-        android:bottom="10dp">
-        <bitmap
-            android:src="@drawable/ic_screen"
-            android:gravity="center" />
-    </item>
+        android:bottom="12dp"
+        android:drawable="@drawable/ic_screen" />
 </layer-list>
