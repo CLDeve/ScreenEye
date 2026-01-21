@@ -95,7 +95,7 @@ class MainActivity : AppCompatActivity() {
     private var lastTrackingId: Int? = null
     private var newOperatorTrackingId: Int? = null
     private var newOperatorStableCount = 0
-    private val operatorStableFrames = 5
+    private val operatorStableFrames = 2
     private val shiftHandler = Handler(Looper.getMainLooper())
     private val shiftTickRunnable = object : Runnable {
         override fun run() {
