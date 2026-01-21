@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var shiftAcknowledgeButton: android.widget.Button
     private lateinit var rootLayout: ConstraintLayout
     private lateinit var alertOverlay: View
+    private lateinit var faceOverlayView: FaceOverlayView
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var logExecutor: ExecutorService
     private lateinit var toneGenerator: ToneGenerator
@@ -139,6 +140,7 @@ class MainActivity : AppCompatActivity() {
         shiftAlertOverlay = findViewById(R.id.shiftAlertOverlay)
         shiftAcknowledgeButton = findViewById(R.id.shiftAcknowledgeButton)
         alertOverlay = findViewById(R.id.alertOverlay)
+        faceOverlayView = findViewById(R.id.faceOverlayView)
         alertOverlay.alpha = 0f
         warningText.visibility = View.GONE
         statsText.visibility = View.GONE
@@ -239,7 +241,12 @@ class MainActivity : AppCompatActivity() {
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         faceDetector.process(image)
             .addOnSuccessListener { faces ->
-                handleFaces(faces)
+                handleFaces(
+                    faces,
+                    imageProxy.width,
+                    imageProxy.height,
+                    imageProxy.imageInfo.rotationDegrees
+                )
             }
             .addOnFailureListener {
                 // Ignore failed frames to keep analysis responsive.
@@ -249,9 +256,26 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    private fun handleFaces(faces: List<Face>) {
+    private fun handleFaces(
+        faces: List<Face>,
+        imageWidth: Int,
+        imageHeight: Int,
+        rotationDegrees: Int
+    ) {
         if (!hasStarted) {
+            runOnUiThread {
+                faceOverlayView.updateFaces(emptyList(), 0, 0, 0, true)
+            }
             return
+        }
+        runOnUiThread {
+            faceOverlayView.updateFaces(
+                faces,
+                imageWidth,
+                imageHeight,
+                rotationDegrees,
+                true
+            )
         }
         val now = System.currentTimeMillis()
         if (lastLookingTimeMs == 0L) {
