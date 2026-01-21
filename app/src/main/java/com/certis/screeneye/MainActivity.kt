@@ -93,6 +93,9 @@ class MainActivity : AppCompatActivity() {
     private var shiftStartMs = 0L
     private var shiftAlertTrackingId: Int? = null
     private var lastTrackingId: Int? = null
+    private var newOperatorTrackingId: Int? = null
+    private var newOperatorStableCount = 0
+    private val operatorStableFrames = 5
     private val shiftHandler = Handler(Looper.getMainLooper())
     private val shiftTickRunnable = object : Runnable {
         override fun run() {
@@ -198,10 +201,17 @@ class MainActivity : AppCompatActivity() {
                 logEvent("SHIFT_SAME_OPERATOR", "tracking_id=$current", null)
                 return@setOnClickListener
             }
+            if (newOperatorTrackingId != current || newOperatorStableCount < operatorStableFrames) {
+                shiftAlertBody.text = "New operator not stable. Please hold still."
+                logEvent("SHIFT_OPERATOR_UNSTABLE", "tracking_id=$current", null)
+                return@setOnClickListener
+            }
             shiftAlertOverlay.visibility = View.GONE
             startShiftTimer()
             shiftAlertBody.text = "Please switch operator and acknowledge."
             shiftAlertTrackingId = null
+            newOperatorTrackingId = null
+            newOperatorStableCount = 0
             logEvent("SHIFT_ACK", null, null)
         }
 
@@ -288,6 +298,14 @@ class MainActivity : AppCompatActivity() {
         val trackingId = faces.firstOrNull()?.trackingId
         if (trackingId != null) {
             lastTrackingId = trackingId
+            if (shiftAlertOverlay.visibility == View.VISIBLE) {
+                if (newOperatorTrackingId == trackingId) {
+                    newOperatorStableCount += 1
+                } else {
+                    newOperatorTrackingId = trackingId
+                    newOperatorStableCount = 1
+                }
+            }
         }
         runOnUiThread {
             faceOverlayView.updateFaces(
@@ -541,6 +559,8 @@ class MainActivity : AppCompatActivity() {
             shiftAlertOverlay.visibility = View.VISIBLE
             shiftAlertBody.text = "Please switch operator and acknowledge."
             shiftAlertTrackingId = lastTrackingId
+            newOperatorTrackingId = null
+            newOperatorStableCount = 0
             shiftHandler.removeCallbacks(shiftTickRunnable)
             playShiftAlertTone()
             logEvent("SHIFT_ALERT", null, null)
