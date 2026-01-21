@@ -196,6 +196,18 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintVertical_bias="0.46" />
 
+        <TextView
+            android:id="@+id/shiftAlertBody"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Please switch operator and acknowledge."
+            android:textColor="@android:color/white"
+            android:textSize="16sp"
+            app:layout_constraintTop_toBottomOf="@id/shiftAlertTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="8dp" />
+
         <Button
             android:id="@+id/shiftAcknowledgeButton"
             android:layout_width="wrap_content"
@@ -206,7 +218,7 @@
             android:paddingEnd="24dp"
             android:paddingTop="10dp"
             android:paddingBottom="10dp"
-            app:layout_constraintTop_toBottomOf="@id/shiftAlertTitle"
+            app:layout_constraintTop_toBottomOf="@id/shiftAlertBody"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="16dp" />
