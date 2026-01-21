@@ -65,8 +65,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var audioManager: AudioManager
     private var originalVolume: Int? = null
     private lateinit var logDao: LogEventDao
-    private lateinit var faceEmbeddingHelper: FaceEmbeddingHelper
-    private var operatorCheckEnabled = false
 
     private var lastLookingTimeMs = 0L
     private var lastAlertTimeMs = 0L
@@ -93,10 +91,8 @@ class MainActivity : AppCompatActivity() {
     private var hasStarted = false
     private val shiftDurationMs = 10 * 1000L
     private var shiftStartMs = 0L
-    private var shiftAlertEmbedding: FloatArray? = null
-    private var lastFaceEmbedding: FloatArray? = null
-    private var lastEmbeddingUpdateMs = 0L
-    private val operatorMatchThreshold = 0.75f
+    private var shiftAlertTrackingId: Int? = null
+    private var lastTrackingId: Int? = null
     private val shiftHandler = Handler(Looper.getMainLooper())
     private val shiftTickRunnable = object : Runnable {
         override fun run() {
@@ -174,11 +170,6 @@ class MainActivity : AppCompatActivity() {
             .enableTracking()
             .build()
         faceDetector = FaceDetection.getClient(options)
-        faceEmbeddingHelper = FaceEmbeddingHelper(this)
-        operatorCheckEnabled = faceEmbeddingHelper.isReady()
-        if (!operatorCheckEnabled) {
-            Toast.makeText(this, "Face model missing: operator check disabled", Toast.LENGTH_LONG).show()
-        }
 
         startButton.setOnClickListener {
             if (!hasStarted) {
@@ -196,28 +187,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         shiftAcknowledgeButton.setOnClickListener {
-            if (!operatorCheckEnabled) {
-                shiftAlertOverlay.visibility = View.GONE
-                startShiftTimer()
-                logEvent("SHIFT_ACK", "operator_check_disabled", null)
-                return@setOnClickListener
-            }
-            val reference = shiftAlertEmbedding
-            val current = lastFaceEmbedding
+            val reference = shiftAlertTrackingId
+            val current = lastTrackingId
             if (reference == null || current == null) {
                 shiftAlertBody.text = "Face not detected. Please face the camera."
                 return@setOnClickListener
             }
-            val similarity = cosineSimilarity(reference, current)
-            if (similarity >= operatorMatchThreshold) {
+            if (reference == current) {
                 shiftAlertBody.text = "Same operator detected. Please switch."
-                logEvent("SHIFT_SAME_OPERATOR", "similarity=${"%.2f".format(similarity)}", null)
+                logEvent("SHIFT_SAME_OPERATOR", "tracking_id=$current", null)
                 return@setOnClickListener
             }
             shiftAlertOverlay.visibility = View.GONE
             startShiftTimer()
             shiftAlertBody.text = "Please switch operator and acknowledge."
-            shiftAlertEmbedding = null
+            shiftAlertTrackingId = null
             logEvent("SHIFT_ACK", null, null)
         }
 
@@ -274,30 +258,11 @@ class MainActivity : AppCompatActivity() {
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
         faceDetector.process(image)
             .addOnSuccessListener { faces ->
-                val embedding = if (operatorCheckEnabled && hasStarted && faces.isNotEmpty()) {
-                    val now = System.currentTimeMillis()
-                    if (faceEmbeddingHelper.isReady() && now - lastEmbeddingUpdateMs > 300L) {
-                        faceEmbeddingHelper.extractEmbedding(
-                            imageProxy,
-                            imageProxy.imageInfo.rotationDegrees,
-                            faces.first()
-                        ).also { extracted ->
-                            if (extracted != null) {
-                                lastEmbeddingUpdateMs = now
-                            }
-                        }
-                    } else {
-                        null
-                    }
-                } else {
-                    null
-                }
                 handleFaces(
                     faces,
                     imageProxy.width,
                     imageProxy.height,
-                    imageProxy.imageInfo.rotationDegrees,
-                    embedding
+                    imageProxy.imageInfo.rotationDegrees
                 )
             }
             .addOnFailureListener {
@@ -312,8 +277,7 @@ class MainActivity : AppCompatActivity() {
         faces: List<Face>,
         imageWidth: Int,
         imageHeight: Int,
-        rotationDegrees: Int,
-        embedding: FloatArray?
+        rotationDegrees: Int
     ) {
         if (!hasStarted) {
             runOnUiThread {
@@ -321,8 +285,9 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        if (embedding != null) {
-            lastFaceEmbedding = embedding
+        val trackingId = faces.firstOrNull()?.trackingId
+        if (trackingId != null) {
+            lastTrackingId = trackingId
         }
         runOnUiThread {
             faceOverlayView.updateFaces(
@@ -575,7 +540,7 @@ class MainActivity : AppCompatActivity() {
         if (remaining == 0L) {
             shiftAlertOverlay.visibility = View.VISIBLE
             shiftAlertBody.text = "Please switch operator and acknowledge."
-            shiftAlertEmbedding = lastFaceEmbedding
+            shiftAlertTrackingId = lastTrackingId
             shiftHandler.removeCallbacks(shiftTickRunnable)
             playShiftAlertTone()
             logEvent("SHIFT_ALERT", null, null)
@@ -600,19 +565,6 @@ class MainActivity : AppCompatActivity() {
         toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
     }
 
-    private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
-        val size = minOf(a.size, b.size)
-        var dot = 0f
-        var normA = 0f
-        var normB = 0f
-        for (i in 0 until size) {
-            dot += a[i] * b[i]
-            normA += a[i] * a[i]
-            normB += b[i] * b[i]
-        }
-        val denom = (kotlin.math.sqrt(normA) * kotlin.math.sqrt(normB)).coerceAtLeast(1e-6f)
-        return dot / denom
-    }
 
     private fun logEvent(type: String, message: String?, durationMs: Long?) {
         val event = LogEvent(
