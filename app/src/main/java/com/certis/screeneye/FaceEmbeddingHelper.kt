@@ -24,18 +24,22 @@ class FaceEmbeddingHelper(context: Context) {
     private val outputSize: Int
 
     init {
-        val modelBuffer = runCatching {
+        val modelBytes = runCatching {
             context.assets.open("face_net.tflite").use { input ->
                 input.readBytes()
             }
         }.getOrNull()
-        if (modelBuffer == null || modelBuffer.size < 1024) {
+        if (modelBytes == null || modelBytes.size < 1024) {
             interpreter = null
             inputSize = 0
             inputType = DataType.FLOAT32
             outputSize = 0
         } else {
-            interpreter = Interpreter(modelBuffer)
+            val buffer = ByteBuffer.allocateDirect(modelBytes.size)
+            buffer.order(ByteOrder.nativeOrder())
+            buffer.put(modelBytes)
+            buffer.rewind()
+            interpreter = Interpreter(buffer)
             val inputShape = interpreter.getInputTensor(0).shape()
             inputSize = inputShape[1]
             inputType = interpreter.getInputTensor(0).dataType()
