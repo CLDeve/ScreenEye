@@ -88,7 +88,7 @@ class MainActivity : AppCompatActivity() {
     private val eyeDownRatioThreshold = 0.04f
     private val eyeClosedProbabilityThreshold = 0.4f
     private var hasStarted = false
-    private val shiftDurationMs = 30 * 60 * 1000L
+    private val shiftDurationMs = 10 * 1000L
     private var shiftStartMs = 0L
     private val shiftHandler = Handler(Looper.getMainLooper())
     private val shiftTickRunnable = object : Runnable {
@@ -519,6 +519,7 @@ class MainActivity : AppCompatActivity() {
         if (remaining == 0L) {
             shiftAlertOverlay.visibility = View.VISIBLE
             shiftHandler.removeCallbacks(shiftTickRunnable)
+            playShiftAlertTone()
             logEvent("SHIFT_ALERT", null, null)
         }
     }
@@ -534,6 +535,11 @@ class MainActivity : AppCompatActivity() {
         baselineEyeYRatio = null
         lastLookingTimeMs = 0L
         isLookingState = null
+    }
+
+    private fun playShiftAlertTone() {
+        setBeepVolumePercent(75)
+        toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
     }
 
     private fun logEvent(type: String, message: String?, durationMs: Long?) {
