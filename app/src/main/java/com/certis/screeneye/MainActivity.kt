@@ -19,7 +19,9 @@ import android.widget.Toast
 import android.widget.TextView
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -65,6 +67,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var audioManager: AudioManager
     private var originalVolume: Int? = null
     private lateinit var logDao: LogEventDao
+    private var exitDialog: AlertDialog? = null
 
     private var lastLookingTimeMs = 0L
     private var lastAlertTimeMs = 0L
@@ -89,7 +92,7 @@ class MainActivity : AppCompatActivity() {
     private val eyeDownRatioThreshold = 0.04f
     private val eyeClosedProbabilityThreshold = 0.4f
     private var hasStarted = false
-    private val shiftDurationMs = 10 * 1000L
+    private val shiftDurationMs = 30 * 60 * 1000L
     private var shiftStartMs = 0L
     private val shiftHandler = Handler(Looper.getMainLooper())
     private val shiftTickRunnable = object : Runnable {
@@ -191,11 +194,18 @@ class MainActivity : AppCompatActivity() {
             logEvent("SHIFT_ACK", null, null)
         }
 
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                showExitDialog()
+            }
+        })
+
         requestCameraPermission.launch(Manifest.permission.CAMERA)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        exitDialog?.dismiss()
         shiftHandler.removeCallbacksAndMessages(null)
         cameraExecutor.shutdown()
         faceDetector.close()
@@ -544,6 +554,37 @@ class MainActivity : AppCompatActivity() {
     private fun playShiftAlertTone() {
         setBeepVolumePercent(75)
         toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 500)
+    }
+
+    private fun showExitDialog() {
+        if (exitDialog?.isShowing == true) {
+            return
+        }
+        val titleView = TextView(this).apply {
+            text = "Exit ScreenEye?"
+            setTextColor(Color.BLACK)
+            textSize = 20f
+            setPadding(48, 40, 48, 0)
+        }
+        exitDialog = AlertDialog.Builder(this)
+            .setCustomTitle(titleView)
+            .setMessage("Do you want to exit the app? Please acknowledge.")
+            .setPositiveButton("Acknowledge") { dialog, _ ->
+                dialog.dismiss()
+                finish()
+            }
+            .setNegativeButton("Cancel") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .create()
+        exitDialog?.setOnShowListener { dialog ->
+            val alert = dialog as AlertDialog
+            alert.findViewById<TextView>(android.R.id.title)?.setTextColor(Color.BLACK)
+            alert.findViewById<TextView>(android.R.id.message)?.setTextColor(Color.BLACK)
+            alert.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.BLACK)
+            alert.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.BLACK)
+        }
+        exitDialog?.show()
     }
 
 

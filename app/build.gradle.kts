@@ -40,15 +40,12 @@ android {
     }
 }
 
-androidComponents {
-    onVariants(selector().withBuildType("debug")) { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("ScreenEye-debug.apk")
-        }
-    }
-    onVariants(selector().withBuildType("release")) { variant ->
-        variant.outputs.forEach { output ->
-            output.outputFileName.set("ScreenEye-release.apk")
+android.applicationVariants.all {
+    outputs.all {
+        val apkOutput = this as com.android.build.gradle.api.ApkVariantOutput
+        when (buildType.name) {
+            "debug" -> apkOutput.outputFileName = "ScreenEye-debug.apk"
+            "release" -> apkOutput.outputFileName = "ScreenEye-release.apk"
         }
     }
 }
